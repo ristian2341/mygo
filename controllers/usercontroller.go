@@ -13,15 +13,23 @@ import (
 )
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Method not allowed",
+			"status": "400",
+		})
 		return
 	}
 
 	// WAJIB parse form dulu
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Gagal membaca form", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal membaca form",
+			"status": "400",
+		})
 		return
 	}
 
@@ -33,14 +41,20 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	// Validasi
 	if username == "" || password == "" || email == "" || nama == "" {
-		http.Error(w, "Semua field harus diisi", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Semua Field harus diisi",
+			"status": "400",
+		})
 		return
 	}
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Gagal memproses password", http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal memproses password",
+			"status": "400",
+		})
 		return
 	}
 
@@ -49,20 +63,29 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// cek user name //
 	err = config.DB.Where("username = ?", username).First(&dataUser).Error
 	if err == nil {
-		http.Error(w, "Email "+username+" sudah ada, masukan email yang lain", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Username "+username+"sudah ada, masukan email yang lain",
+			"status": "400",
+		})
 		return
 	}
 
 	// cek email //
 	err = config.DB.Where("email = ?", email).First(&dataUser).Error
 	if err == nil {
-		http.Error(w, "Email "+email+" sudah ada, masukan email yang lain", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Email "+email+" sudah ada, masukan email yang lain",
+			"status": "400",
+		})
 		return
 	}
 
 	code, err := GenerateUserCode()
 	if err != nil {
-		http.Error(w, "Gagal generate code", http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal generate code",
+			"status": "400",
+		})
 		return
 	}
 
@@ -116,10 +139,11 @@ func GenerateUserCode() (string, error) {
 func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
+	
 	if r.Method != http.MethodPost {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Method not allowed",
-			"status": "404",
+			"status": "400",
 		})
 		return
 	}
@@ -128,7 +152,7 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Gagal membaca form",
-			"status": "404",
+			"status": "400",
 		})
 		return
 	}
@@ -141,7 +165,7 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	if verify_code == "" {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Kode Verikasi tidak boleh kosong",
-			"status": "404",
+			"status": "400",
 		})
 		return
 	}
@@ -149,7 +173,7 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	if password == "" {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Password tidak boleh kosong",
-			"status": "404",
+			"status": "400",
 		})
 		return
 	}
@@ -157,7 +181,7 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	if password_confirm == "" {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Retype Password tidak boleh kosong",
-			"status": "404",
+			"status": "400",
 		})
 		return
 	}
@@ -165,7 +189,7 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	if password_confirm != password {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Password dan Retype Password tidak sama",
-			"status": "404",
+			"status": "400",
 		})
 		return
 	}

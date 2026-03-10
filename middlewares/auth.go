@@ -44,23 +44,33 @@ func TokenRequired() gin.HandlerFunc {
 }
 
 func GenerateResetPassword(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Method not allowed",
+			"status": "400",
+		})
 		return
 	}
 
 	// WAJIB parse form dulu
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Gagal membaca form", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Gagal membaca form",
+			"status": "400",
+		})
 		return
 	}
 
 	// Ambil data dari form
 	email := r.FormValue("email")
-
 	if email == "" {
-		http.Error(w, "Email harus diisi", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Email harus di isi",
+			"status": "400",
+		})
 		return
 	}
 
@@ -69,7 +79,10 @@ func GenerateResetPassword(w http.ResponseWriter, r *http.Request) {
 	err := config.DB.Where("email = ? ", email).First(&dataUser).Error
 	if err != nil {
 		if err.Error() == "record not found" {
-			http.Error(w, "Email : "+email+" tidak ditemukan", http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":  "Email : " + email + " tidak ditemukan",
+				"status": "400",
+			})
 			return
 		}
 	}

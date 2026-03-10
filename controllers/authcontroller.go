@@ -43,6 +43,9 @@ func GenerateTokenHandler(code string, n int) string {
 }
 
 func GetLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	
 	var dataUser models.User
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -56,14 +59,20 @@ func GetLogin(w http.ResponseWriter, r *http.Request) {
 	// query tabel user //
 	err := config.DB.Where("(username = ? or email = ? )", username, username).First(&dataUser).Error
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  err.Error(),
+			"status": "400",
+		})
 		return
 	}
 
 	// Hash password
 	err = bcrypt.CompareHashAndPassword([]byte(dataUser.Password), []byte(password))
 	if err != nil {
-		http.Error(w, "Password tidak valid", http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Password tidak valid",
+			"status": "400",
+		})
 		return
 	}
 
@@ -78,7 +87,10 @@ func GetLogin(w http.ResponseWriter, r *http.Request) {
 	).Err()
 
 	if err != nil {
-		http.Error(w, "Gagal menyimpan token", http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal menyimpan token",
+			"status": "400",
+		})
 		return
 	}
 
@@ -92,7 +104,10 @@ func GetLogin(w http.ResponseWriter, r *http.Request) {
 		}).Error
 
 	if err != nil {
-		http.Error(w, "Gagal update login", http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal Login",
+			"status": "400",
+		})
 		return
 	}
 
