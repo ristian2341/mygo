@@ -18,7 +18,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Method not allowed",
+			"error":  "Method not allowed",
 			"status": "400",
 		})
 		return
@@ -27,7 +27,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// WAJIB parse form dulu
 	if err := r.ParseForm(); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Gagal membaca form",
+			"error":  "Gagal membaca form",
 			"status": "400",
 		})
 		return
@@ -42,7 +42,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// Validasi
 	if username == "" || password == "" || email == "" || nama == "" {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Semua Field harus diisi",
+			"error":  "Semua Field harus diisi",
 			"status": "400",
 		})
 		return
@@ -52,7 +52,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Gagal memproses password",
+			"error":  "Gagal memproses password",
 			"status": "400",
 		})
 		return
@@ -64,7 +64,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	err = config.DB.Where("username = ?", username).First(&dataUser).Error
 	if err == nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Username "+username+"sudah ada, masukan email yang lain",
+			"error":  "Username " + username + "sudah ada, masukan email yang lain",
 			"status": "400",
 		})
 		return
@@ -74,7 +74,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	err = config.DB.Where("email = ?", email).First(&dataUser).Error
 	if err == nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Email "+email+" sudah ada, masukan email yang lain",
+			"error":  "Email " + email + " sudah ada, masukan email yang lain",
 			"status": "400",
 		})
 		return
@@ -83,7 +83,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	code, err := GenerateUserCode()
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Gagal generate code",
+			"error":  "Gagal generate code",
 			"status": "400",
 		})
 		return
@@ -139,7 +139,7 @@ func GenerateUserCode() (string, error) {
 func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
-	
+
 	if r.Method != http.MethodPost {
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":  "Method not allowed",
@@ -210,17 +210,17 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Gagal memproses password",
+			"error": "Gagal memproses data",
 		})
 		return
 	}
 
 	// Update db User update verify_code //
-	result := config.DB.Model(&models.User{}).Where("verify_code = ? ", verify_code).Update("password", hashPassword)
+	result := config.DB.Model(&models.User{}).Where("verify_code = ? ", verify_code).Update("password", hashPassword).Update("verify_code", "")
 
 	if result.Error != nil {
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Gagal memproses password",
+			"error": "Gagal memproses data",
 		})
 		return
 	}
@@ -228,4 +228,185 @@ func PasswordReset(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Reset Password Berhasil.",
 	})
+}
+
+func ChangePasword(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+
+	if r.Method != http.MethodPost {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Method not allowed",
+			"status": "400",
+		})
+		return
+	}
+
+	// WAJIB parse form dulu
+	if err := r.ParseForm(); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Gagal membaca form",
+			"status": "400",
+		})
+		return
+	}
+
+	// Ambil data dari form
+	username := r.FormValue("username")
+	password_lama := r.FormValue("password_lama")
+	password_baru := r.FormValue("password_baru")
+	password_confirm := r.FormValue("password_confirm")
+
+	if password_lama == "" {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Password tidak boleh kosong",
+			"status": "400",
+		})
+		return
+	}
+
+	var dataUser models.User
+	err := config.DB.Where("username = ? ", username).First(&dataUser).Error
+	if err != nil {
+		if err.Error() == "record not found" {
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":  "Username tidak ditemukan",
+				"status": "400",
+			})
+			return
+		}
+	}
+
+	// Hash password
+	err = bcrypt.CompareHashAndPassword([]byte(dataUser.Password), []byte(password_lama))
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Password tidak valid",
+			"status": "400",
+		})
+		return
+	}
+
+	if password_confirm == "" {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Retype Password tidak boleh kosong",
+			"status": "400",
+		})
+		return
+	}
+
+	if password_confirm != password_baru {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Password dan Retype Password tidak sama",
+			"status": "400",
+		})
+		return
+	}
+
+	// Hash password
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(password_baru), bcrypt.DefaultCost)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal memproses password",
+		})
+		return
+	}
+
+	// Update db User update username //
+	result := config.DB.Model(&models.User{}).Where("username = ? ", username).Update("password", hashPassword)
+
+	if result.Error != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal memproses data",
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Ubah Password Berhasil.",
+	})
+}
+
+func UpdateDataUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+
+	if r.Method != http.MethodPost {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Method not allowed",
+			"status": "400",
+		})
+		return
+	}
+
+	// WAJIB parse form dulu
+	if err := r.ParseForm(); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Gagal membaca form",
+			"status": "400",
+		})
+		return
+	}
+
+	// Ambil data dari form
+	code := r.FormValue("code")
+	username := r.FormValue("username")
+	email := r.FormValue("email")
+	nama := r.FormValue("nama")
+	foto := r.FormValue("foto")
+	phone := r.FormValue("phone")
+	supervisor := r.FormValue("supervisor")
+
+	if email == "" {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":  "Email tidak boleh kosong",
+			"status": "400",
+		})
+		return
+	}
+
+	// data user //
+	var dataUser models.User
+	err := config.DB.Where("code = ? and username = ?", code, username).First(&dataUser).Error
+	if err != nil {
+		if err.Error() == "record not found" {
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Kode verifikasi tidak ditemukan, Mohon cek kembali email anda",
+			})
+			return
+		}
+	}
+
+	// cek email apakah sudah dipakai user lain //
+	err = config.DB.Where("code <> ? and email = ?  ", code, email).First(&dataUser).Error
+	if err == nil {
+		if dataUser.Email == email {
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Email sudah dipakai oleh user lain, masukan email yang lain",
+			})
+			return
+		}
+	}
+
+	// Update db User update username //
+	result := config.DB.Model(&models.User{}).Where("username = ?", username).
+		Updates(map[string]interface{}{
+			"email":      email,
+			"nama":       nama,
+			"foto":       foto,
+			"phone":      phone,
+			"supervisor": supervisor,
+		})
+
+	if result.Error != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Gagal memproses data",
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Update User Berhasil.",
+	})
+
 }

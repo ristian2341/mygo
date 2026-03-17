@@ -25,18 +25,36 @@ func TokenRequired() gin.HandlerFunc {
 			return
 		}
 
-		// nanti bisa kamu cek ke Redis
+		// cek token di Redis
 		_, err := config.RedisClient.Get(
 			config.Ctx,
 			token,
 		).Result()
 
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Token invalid or expired",
-			})
-			c.Abort()
-			return
+
+			// jika tidak ada di redis, cek ke database
+			var user models.User
+			db := config.DB
+
+			errDB := db.Where("access_token = ?", token).First(&user).Error
+			if errDB != nil {
+
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Token invalid or expired",
+				})
+				c.Abort()
+				return
+			}
+
+			// jika ditemukan di DB, simpan lagi ke Redis (optional)
+			config.RedisClient.Set(
+				config.Ctx,
+				token,
+				user.Username,
+				12*time.Hour,
+			)
+
 		}
 
 		c.Next()
