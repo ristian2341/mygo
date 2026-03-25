@@ -55,4 +55,16 @@ func SetupRoutes(r *gin.Engine) {
 	auth.POST("/user/update-user", func(c *gin.Context) {
 		controllers.UpdateDataUser(c.Writer, c.Request)
 	})
+
+	auth.GET("user/get-users", func(c *gin.Context) {
+		q := c.Query("q")
+		code := c.Query("code")
+
+		users, err := controllers.GetAllUsers(q, code)
+		if err != nil {
+			c.JSON(500, gin.H{"Error" : err.Error()})
+		}
+
+		c.JSON(200,users)
+	})
 }

@@ -7,8 +7,7 @@ import (
 )
 
 type Rab struct {
-	ID          uint           `gorm:"primaryKey"`
-	Code        string         `json:"code"`
+	Code        string         `gorm:"primaryKey;type:char(12)" json:"code"`
 	CodeProject string         `json:"code_project"`
 	TglMulai    time.Time      `json:"tgl_mulai"`
 	TglAkhir    time.Time      `json:"tgl_akhir"`
@@ -18,6 +17,13 @@ type Rab struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
+
+	RabDetails []RabDetail `gorm:"foreignKey:Code;references:Code"`
+	RabKelompoks []RabKelompok `gorm:"foreignKey:Code;references:Code"`
+}
+
+func (Rab) TableName() string {
+	return  "rab"
 }
 
 func (r *Rab) BeforeCreate(tx *gorm.DB) (err error) {
@@ -44,4 +50,6 @@ func GetUserID(tx *gorm.DB) uint {
 	}
 	return userID
 }
+
+
 

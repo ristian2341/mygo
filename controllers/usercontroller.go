@@ -410,3 +410,24 @@ func UpdateDataUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 }
+
+func GetAllUsers(q string, code string) ([]models.User, error) {
+	var users []models.User
+
+	query := config.DB.Model(&users)
+
+	// Kita buat wildcard string sekali saja
+	searchTerm := "%" + q + "%"
+
+	if q != "" {
+		query = query.Where("username LIKE ? or email like ? or nama like ? ", searchTerm, searchTerm, searchTerm)
+	}
+
+	if code != "" {
+		query = query.Where("code = ?", code)
+	}
+
+	err := query.Find(&users).Error
+
+	return users, err
+}
