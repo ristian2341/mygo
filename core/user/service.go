@@ -1,4 +1,4 @@
-package usecase
+package user
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	mr "math/rand"
-	"mygo/domain"
 	"mygo/utils"
 	"strconv"
 	"time"
@@ -16,17 +15,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type userUsecase struct {
-	userRepo domain.UserRepository
+type userService struct {
+	userRepo Repository
 }
 
-func NewUserUsecase(repo domain.UserRepository) domain.UserUsecase {
-	return &userUsecase{
+func NewUserService(repo Repository) Service {
+	return &userService{
 		userRepo: repo,
 	}
 }
 
-func (u *userUsecase) Register(ctx context.Context, username, password, email, nama string) error {
+func (u *userService) Register(ctx context.Context, username, password, email, nama string) error {
 	// cek duplikasi username
 	_, err := u.userRepo.GetByUsername(ctx, username)
 	if err == nil {
@@ -51,7 +50,7 @@ func (u *userUsecase) Register(ctx context.Context, username, password, email, n
 		return errors.New("Gagal generate code")
 	}
 
-	user := &domain.User{
+	userData := &User{
 		Code:     code,
 		Username: username,
 		Password: string(hashedPassword),
@@ -59,10 +58,10 @@ func (u *userUsecase) Register(ctx context.Context, username, password, email, n
 		Nama:     nama,
 	}
 
-	return u.userRepo.Create(ctx, user)
+	return u.userRepo.Create(ctx, userData)
 }
 
-func (u *userUsecase) generateUserCode(ctx context.Context) (string, error) {
+func (u *userService) generateUserCode(ctx context.Context) (string, error) {
 	today := time.Now().Format("20060102")
 	lastCode, err := u.userRepo.GetLastCodeByDate(ctx, today)
 
@@ -78,47 +77,47 @@ func (u *userUsecase) generateUserCode(ctx context.Context) (string, error) {
 	return newCode, nil
 }
 
-func (u *userUsecase) CheckToken(ctx context.Context, token string) error {
+func (u *userService) CheckToken(ctx context.Context, token string) error {
 	_, err := u.userRepo.GetRedisToken(ctx, token)
 	if err != nil {
 		// jika tidak ada di redis, cek db
-		user, errDb := u.userRepo.GetByAccessToken(ctx, token)
+		userData, errDb := u.userRepo.GetByAccessToken(ctx, token)
 		if errDb != nil {
 			return errors.New("Token invalid or expired")
 		}
 		// resave optional
-		u.userRepo.SetRedisToken(ctx, token, user.Username, 12)
+		u.userRepo.SetRedisToken(ctx, token, userData.Username, 12)
 	}
 	return nil
 }
 
-func (u *userUsecase) Login(ctx context.Context, username, password string) (map[string]interface{}, error) {
-	user, err := u.userRepo.GetByUsernameOrEmail(ctx, username)
+func (u *userService) Login(ctx context.Context, username, password string) (map[string]interface{}, error) {
+	userData, err := u.userRepo.GetByUsernameOrEmail(ctx, username)
 	if err != nil {
 		return nil, errors.New("User tidak ditemukan")
 	}
 
 	// Hash password
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	err = bcrypt.CompareHashAndPassword([]byte(userData.Password), []byte(password))
 	if err != nil {
 		return nil, errors.New("Password tidak valid")
 	}
 
 	// generate token
 	date := time.Now().Format("02012006")
-	rawToken := user.Code + date
+	rawToken := userData.Code + date
 	hash := sha256.Sum256([]byte(rawToken))
 	token := hex.EncodeToString(hash[:])
 
 	// save to redis 12 hours
-	err = u.userRepo.SetRedisToken(ctx, token, user.Username, 12)
+	err = u.userRepo.SetRedisToken(ctx, token, userData.Username, 12)
 	if err != nil {
 		return nil, errors.New("Gagal menyimpan token")
 	}
 
 	loginAt := time.Now().Format("2006-01-02 15:04:05")
 
-	err = u.userRepo.UpdateByCode(ctx, user.Code, map[string]interface{}{
+	err = u.userRepo.UpdateByCode(ctx, userData.Code, map[string]interface{}{
 		"login_at":     loginAt,
 		"access_token": token,
 	})
@@ -127,16 +126,16 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (map
 	}
 
 	response := map[string]interface{}{
-		"username": user.Username,
-		"name":     user.Nama,
+		"username": userData.Username,
+		"name":     userData.Nama,
 		"token":    token,
 	}
 
 	return response, nil
 }
 
-func (u *userUsecase) PasswordResetRequest(ctx context.Context, email string) error {
-	user, err := u.userRepo.GetByEmail(ctx, email)
+func (u *userService) PasswordResetRequest(ctx context.Context, email string) error {
+	userData, err := u.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return fmt.Errorf("Email : %s tidak ditemukan", email)
 	}
@@ -151,7 +150,7 @@ func (u *userUsecase) PasswordResetRequest(ctx context.Context, email string) er
 		return errors.New("Gagal mengupdate verify code")
 	}
 
-	body := "Hi, " + user.Nama + "\n\n" +
+	body := "Hi, " + userData.Nama + "\n\n" +
 		"Berikut kami kirimkan kode verifikasi untuk reset password anda.\n\n" +
 		"Kode Verifikasi: " + verifyCode + "\n\n" +
 		"Terima kasih."
@@ -162,7 +161,7 @@ func (u *userUsecase) PasswordResetRequest(ctx context.Context, email string) er
 	return nil
 }
 
-func (u *userUsecase) PasswordResetSubmit(ctx context.Context, verifyCode, password, passwordConfirm string) error {
+func (u *userService) PasswordResetSubmit(ctx context.Context, verifyCode, password, passwordConfirm string) error {
 	if password != passwordConfirm {
 		return errors.New("Password dan Retype Password tidak sama")
 	}
@@ -183,13 +182,13 @@ func (u *userUsecase) PasswordResetSubmit(ctx context.Context, verifyCode, passw
 	})
 }
 
-func (u *userUsecase) ChangePassword(ctx context.Context, username, oldPassword, newPassword, passwordConfirm string) error {
-	user, err := u.userRepo.GetByUsername(ctx, username)
+func (u *userService) ChangePassword(ctx context.Context, username, oldPassword, newPassword, passwordConfirm string) error {
+	userData, err := u.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		return errors.New("Username tidak ditemukan")
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword))
+	err = bcrypt.CompareHashAndPassword([]byte(userData.Password), []byte(oldPassword))
 	if err != nil {
 		return errors.New("Password lama tidak valid")
 	}
@@ -208,7 +207,7 @@ func (u *userUsecase) ChangePassword(ctx context.Context, username, oldPassword,
 	})
 }
 
-func (u *userUsecase) UpdateProfile(ctx context.Context, code, username, email, nama, foto, phone, supervisor string) error {
+func (u *userService) UpdateProfile(ctx context.Context, code, username, email, nama, foto, phone, supervisor string) error {
 	_, err := u.userRepo.GetByCodeAndUsername(ctx, code, username)
 	if err != nil {
 		return errors.New("Data user tidak ditemukan")
@@ -229,11 +228,11 @@ func (u *userUsecase) UpdateProfile(ctx context.Context, code, username, email, 
 	})
 }
 
-func (u *userUsecase) GetUsers(ctx context.Context, q, code string) ([]domain.User, error) {
+func (u *userService) GetUsers(ctx context.Context, q, code string) ([]User, error) {
 	return u.userRepo.FetchAll(ctx, q, code)
 }
 
-func (u *userUsecase) GenerateRandomToken(ctx context.Context) (string, error) {
+func (u *userService) GenerateRandomToken(ctx context.Context) (string, error) {
 	timeStr := time.Now().Format("20060102150405")
 	randomBytes := make([]byte, 8)
 	_, err := rand.Read(randomBytes)

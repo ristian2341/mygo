@@ -1,21 +1,30 @@
-package handler
+package user
 
 import (
-	"mygo/domain"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-type UserHandler struct {
-	userUsecase domain.UserUsecase
+type Controller struct {
+	userService Service
 }
 
-func NewUserHandler(r *gin.Engine, us domain.UserUsecase, authMiddleware gin.HandlerFunc) {
-	handler := &UserHandler{
-		userUsecase: us,
+func SetupController(r *gin.Engine, us Service, authMiddleware gin.HandlerFunc) {
+	handler := &Controller{
+		userService: us,
 	}
 
+	// Public Auth Endpoints
+	r.GET("/token_random", handler.GenerateToken)
+	
+	auth := r.Group("/auth")
+	{
+		auth.POST("/login", handler.Login)
+		auth.POST("/reset-password", handler.ResetPasswordRequest)
+	}
+
+	// Protected User Endpoints
 	userGrp := r.Group("/user")
 	userGrp.Use(authMiddleware)
 	{
@@ -27,7 +36,57 @@ func NewUserHandler(r *gin.Engine, us domain.UserUsecase, authMiddleware gin.Han
 	}
 }
 
-func (h *UserHandler) RegisterUser(c *gin.Context) {
+func (h *Controller) GenerateToken(c *gin.Context) {
+	token, err := h.userService.GenerateRandomToken(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": token,
+	})
+}
+
+func (h *Controller) Login(c *gin.Context) {
+	var input struct {
+		Username string `form:"username" binding:"required"`
+		Password string `form:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBind(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data", "status": "400"})
+		return
+	}
+
+	res, err := h.userService.Login(c.Request.Context(), input.Username, input.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "400"})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *Controller) ResetPasswordRequest(c *gin.Context) {
+	email := c.PostForm("email")
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email harus di isi", "status": "400"})
+		return
+	}
+
+	err := h.userService.PasswordResetRequest(c.Request.Context(), email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "400"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Kode Verifikasi Reset Password sudah terkirim Email, cek email anda atau cek di folder spam",
+	})
+}
+
+func (h *Controller) RegisterUser(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 	email := c.PostForm("email")
@@ -38,7 +97,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	err := h.userUsecase.Register(c.Request.Context(), username, password, email, nama)
+	err := h.userService.Register(c.Request.Context(), username, password, email, nama)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "400"})
 		return
@@ -49,7 +108,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	})
 }
 
-func (h *UserHandler) PasswordResetSubmit(c *gin.Context) {
+func (h *Controller) PasswordResetSubmit(c *gin.Context) {
 	verifyCode := c.PostForm("verify_code")
 	password := c.PostForm("password")
 	passwordConfirm := c.PostForm("password_confirm")
@@ -67,16 +126,16 @@ func (h *UserHandler) PasswordResetSubmit(c *gin.Context) {
 		return
 	}
 
-	err := h.userUsecase.PasswordResetSubmit(c.Request.Context(), verifyCode, password, passwordConfirm)
+	err := h.userService.PasswordResetSubmit(c.Request.Context(), verifyCode, password, passwordConfirm)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) // using default format from old code
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Reset Password Berhasil."})
 }
 
-func (h *UserHandler) ChangePassword(c *gin.Context) {
+func (h *Controller) ChangePassword(c *gin.Context) {
 	username := c.PostForm("username")
 	passwordLama := c.PostForm("password_lama")
 	passwordBaru := c.PostForm("password_baru")
@@ -91,7 +150,7 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	err := h.userUsecase.ChangePassword(c.Request.Context(), username, passwordLama, passwordBaru, passwordConfirm)
+	err := h.userService.ChangePassword(c.Request.Context(), username, passwordLama, passwordBaru, passwordConfirm)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "status": "400"})
 		return
@@ -100,7 +159,7 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Ubah Password Berhasil."})
 }
 
-func (h *UserHandler) UpdateUser(c *gin.Context) {
+func (h *Controller) UpdateUser(c *gin.Context) {
 	code := c.PostForm("code")
 	username := c.PostForm("username")
 	email := c.PostForm("email")
@@ -114,7 +173,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	err := h.userUsecase.UpdateProfile(c.Request.Context(), code, username, email, nama, foto, phone, supervisor)
+	err := h.userService.UpdateProfile(c.Request.Context(), code, username, email, nama, foto, phone, supervisor)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -123,11 +182,11 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Update User Berhasil."})
 }
 
-func (h *UserHandler) GetUsers(c *gin.Context) {
+func (h *Controller) GetUsers(c *gin.Context) {
 	q := c.Query("q")
 	code := c.Query("code")
 
-	users, err := h.userUsecase.GetUsers(c.Request.Context(), q, code)
+	users, err := h.userService.GetUsers(c.Request.Context(), q, code)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -2,9 +2,9 @@ package main
 
 import (
 	"mygo/config"
-	"mygo/repository"
+	"mygo/core/user"
+	"mygo/modules/rab"
 	"mygo/routes"
-	"mygo/usecase"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,19 +15,24 @@ func main() {
 	config.InitRedis()
 
 	// 2. Setup Dependencies
-	userRepo := repository.NewMySQLUserRepository(config.DB, config.RedisClient)
-	userUsecase := usecase.NewUserUsecase(userRepo)
+	// Core
+	userRepo := user.NewMySQLUserRepository(config.DB, config.RedisClient)
+	userService := user.NewUserService(userRepo)
+	
+	// Modules
+	rabRepo := rab.NewMySQLRabRepository(config.DB)
+	rabService := rab.NewRabService(rabRepo)
 
 	// 3. Setup Router
 	r := gin.Default()
 	
 	// Default route
 	r.GET("/", func(c *gin.Context) {
-		c.String(200, "Golang Web Server is running with Clean Architecture!")
+		c.String(200, "Golang Web Server is running with Modular (Package-by-Feature) Architecture!")
 	})
 
 	// Register all endpoints
-	routes.SetupRoutes(r, userUsecase)
+	routes.SetupRoutes(r, userService, rabService)
 
 	// 4. Run Server
 	r.Run(":6000")

@@ -1,13 +1,13 @@
 package middlewares
 
 import (
-	"mygo/domain"
+	"mygo/core/user"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func TokenRequired(uc domain.UserUsecase) gin.HandlerFunc {
+func TokenRequired(uc user.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if token == "" {

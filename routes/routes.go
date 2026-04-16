@@ -1,18 +1,18 @@
 package routes
 
 import (
-	"mygo/domain"
-	"mygo/handler"
+	"mygo/core/user"
 	"mygo/middlewares"
+	"mygo/modules/rab"
 
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, uc domain.UserUsecase) {
+func SetupRoutes(r *gin.Engine, us user.Service, rabSvc rab.Service) {
 	// middlewares
-	authMw := middlewares.TokenRequired(uc)
+	authMw := middlewares.TokenRequired(us)
 
 	// endpoints registration
-	handler.NewAuthHandler(r, uc)
-	handler.NewUserHandler(r, uc, authMw)
+	user.SetupController(r, us, authMw)
+	rab.SetupController(r, rabSvc, authMw)
 }

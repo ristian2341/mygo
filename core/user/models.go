@@ -1,4 +1,4 @@
-package domain
+package user
 
 import "context"
 
@@ -22,7 +22,7 @@ func (User) TableName() string {
 	return "user" // isi dengan nama tabel yang kamu mau
 }
 
-type UserRepository interface {
+type Repository interface {
 	GetByUsername(ctx context.Context, username string) (User, error)
 	GetByEmail(ctx context.Context, email string) (User, error)
 	GetByUsernameOrEmail(ctx context.Context, identifier string) (User, error)
@@ -42,7 +42,7 @@ type UserRepository interface {
 	GetRedisToken(ctx context.Context, token string) (string, error)
 }
 
-type UserUsecase interface {
+type Service interface {
 	Register(ctx context.Context, username, password, email, nama string) error
 	Login(ctx context.Context, username, password string) (map[string]interface{}, error)
 	PasswordResetRequest(ctx context.Context, email string) error
