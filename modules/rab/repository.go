@@ -16,12 +16,19 @@ func NewMySQLRabRepository(db *gorm.DB) Repository {
 	}
 }
 
-func (r *mysqlRabRepository) Create(ctx context.Context, rab *Rab) error {
-	return r.db.WithContext(ctx).Create(rab).Error
-}
+func (r *mysqlRabRepository) FetchAll(ctx context.Context, q string, code string) ([]Rab, error) {
+	var dataRabs []Rab
+	query := r.db.WithContext(ctx).Model(&dataRabs)
 
-func (r *mysqlRabRepository) GetAll(ctx context.Context) ([]Rab, error) {
-	var rabs []Rab
-	err := r.db.WithContext(ctx).Find(&rabs).Error
-	return rabs, err
+	if q != "" {
+		searchTerm := "%" + q + "%"
+		query = query.Where("CodeProject LIKE ? OR email LIKE ? OR nama LIKE ?", searchTerm, searchTerm, searchTerm)
+	}
+
+	if code != "" {
+		query = query.Where("code = ?", code)
+	}
+
+	err := query.Find(&dataRabs).Error
+	return dataRabs, err
 }

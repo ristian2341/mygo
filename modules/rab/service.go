@@ -2,7 +2,6 @@ package rab
 
 import (
 	"context"
-	"errors"
 )
 
 type rabService struct {
@@ -15,20 +14,6 @@ func NewRabService(repo Repository) Service {
 	}
 }
 
-func (s *rabService) CreateRab(ctx context.Context, projectName string, totalAmount int64, username string) error {
-	if projectName == "" {
-		return errors.New("Project name is required")
-	}
-
-	rab := &Rab{
-		ProjectName: projectName,
-		TotalAmount: totalAmount,
-		CreatedBy:   username,
-	}
-
-	return s.rabRepo.Create(ctx, rab)
-}
-
-func (s *rabService) GetListRab(ctx context.Context) ([]Rab, error) {
-	return s.rabRepo.GetAll(ctx)
+func (s *rabService) GetListRab(ctx context.Context, q string, code string) ([]Rab, error) {
+	return s.rabRepo.FetchAll(ctx, q, code)
 }
