@@ -50,6 +50,6 @@ type Service interface {
 	ChangePassword(ctx context.Context, username, oldPassword, newPassword, passwordConfirm string) error
 	UpdateProfile(ctx context.Context, code, username, email, nama, foto, phone, supervisor string) error
 	GetUsers(ctx context.Context, q, code string) ([]User, error)
-	CheckToken(ctx context.Context, token string) error 
+	CheckToken(ctx context.Context, token string) (string, error)
 	GenerateRandomToken(ctx context.Context) (string, error)
 }

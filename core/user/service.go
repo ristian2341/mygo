@@ -77,18 +77,12 @@ func (u *userService) generateUserCode(ctx context.Context) (string, error) {
 	return newCode, nil
 }
 
-func (u *userService) CheckToken(ctx context.Context, token string) error {
-	_, err := u.userRepo.GetRedisToken(ctx, token)
+func (u *userService) CheckToken(ctx context.Context, token string) (string, error) {
+	code, err := u.userRepo.GetRedisToken(ctx, token)
 	if err != nil {
-		// jika tidak ada di redis, cek db
-		userData, errDb := u.userRepo.GetByAccessToken(ctx, token)
-		if errDb != nil {
-			return errors.New("Token invalid or expired")
-		}
-		// resave optional
-		u.userRepo.SetRedisToken(ctx, token, userData.Username, 12)
+		return "", errors.New("Sesi Anda telah habis atau tidak valid, silakan login kembali")
 	}
-	return nil
+	return code, nil
 }
 
 func (u *userService) Login(ctx context.Context, username, password string) (map[string]interface{}, error) {
@@ -110,7 +104,7 @@ func (u *userService) Login(ctx context.Context, username, password string) (map
 	token := hex.EncodeToString(hash[:])
 
 	// save to redis 12 hours
-	err = u.userRepo.SetRedisToken(ctx, token, userData.Username, 12)
+	err = u.userRepo.SetRedisToken(ctx, token, userData.Code, 12)
 	if err != nil {
 		return nil, errors.New("Gagal menyimpan token")
 	}
